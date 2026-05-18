@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snack Attack - Recipe Finder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="style3.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="bg-white border-b border-stone-200 sticky top-0 z-50 backdrop-blur-lg bg-opacity-90">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-rose-500 flex items-center justify-center">
+                        <i class="fa-solid fa-cookie-bite text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-display text-2xl md:text-3xl font-bold text-stone-900">Snack Attack</h1>
+                        <p class="text-xs text-stone-500">Delicious snack recipes from around the world</p>
+                    </div>
+                </div>
+                
+                <div class="relative w-full md:w-96">
+                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-stone-400"></i>
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Search by name or ingredient..." 
+                        class="search-input w-full pl-11 pr-4 py-3 rounded-xl border border-stone-300 bg-stone-50 focus:bg-white focus:outline-none text-sm"
+                    >
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+        <!-- Stats Bar -->
+        <div id="statsBar" class="mb-8 hidden">
+            <p class="text-stone-600 text-sm">
+                Showing <span id="resultCount" class="font-semibold text-stone-900">0</span> snack recipes
+            </p>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div class="skeleton-card loading-shimmer"></div>
+            <div class="skeleton-card loading-shimmer"></div>
+            <div class="skeleton-card loading-shimmer"></div>
+            <div class="skeleton-card loading-shimmer"></div>
+            <div class="skeleton-card loading-shimmer"></div>
+            <div class="skeleton-card loading-shimmer"></div>
+            <div class="skeleton-card loading-shimmer"></div>
+            <div class="skeleton-card loading-shimmer"></div>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="hidden">
+            <div class="max-w-md mx-auto text-center py-16">
+                <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-red-50 flex items-center justify-center">
+                    <i class="fa-solid fa-triangle-exclamation text-3xl text-red-500"></i>
+                </div>
+                <h3 class="text-xl font-semibold text-stone-900 mb-2">Oops! Something went wrong</h3>
+                <p class="text-stone-600 mb-6" id="errorMessage">We couldn't fetch the recipes. Please try again.</p>
+                <button id="retryBtn" class="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-medium transition-colors">
+                    <i class="fa-solid fa-rotate-right mr-2"></i>Try Again
+                </button>
+            </div>
+        </div>
+
+        <!-- No Results State -->
+        <div id="noResultsState" class="hidden">
+            <div class="max-w-md mx-auto text-center py-16">
+                <i class="fa-regular fa-face-sad-tear no-results-icon mb-6"></i>
+                <h3 class="text-xl font-semibold text-stone-900 mb-2">No recipes found</h3>
+                <p class="text-stone-600">Try adjusting your search or filter to find what you're looking for.</p>
+            </div>
+        </div>
+
+        <!-- Recipe Grid -->
+        <div id="recipeGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-16 border-t border-stone-200 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="text-center text-sm text-stone-500">
+                <p>Data provided by <a href="https://dummyjson.com" target="_blank" class="text-orange-600 hover:text-orange-700 font-medium">dummyjson.com</a></p>
+                <p class="mt-2">Made with <i class="fa-solid fa-heart text-red-500"></i> for snack lovers</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const API_URL = 'https://dummyjson.com/recipes/meal-type/snack';
+        let allRecipes = [];
+        let filteredRecipes = [];
+
+        const elements = {
+            grid: document.getElementById('recipeGrid'),
+            loading: document.getElementById('loadingState'),
+            error: document.getElementById('errorState'),
+            noResults: document.getElementById('noResultsState'),
+            searchInput: document.getElementById('searchInput'),
+            statsBar: document.getElementById('statsBar'),
+            resultCount: document.getElementById('resultCount'),
+            errorMessage: document.getElementById('errorMessage'),
+            retryBtn: document.getElementById('retryBtn')
+        };
+
+        // Fetch recipes from API
+        async function fetchRecipes() {
+            showLoading();
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                allRecipes = data.recipes || [];
+                filteredRecipes = [...allRecipes];
+                renderRecipes(filteredRecipes);
+                updateStats();
+                hideLoading();
+            } catch (error) {
+                console.error('Error fetching recipes:', error);
+                showError(error.message);
+            }
+        }
+
+        // Render recipe cards
+        function renderRecipes(recipes) {
+            if (recipes.length === 0) {
+                showNoResults();
+                return;
+            }
+
+            hideNoResults();
+            elements.grid.innerHTML = recipes.map(recipe => createRecipeCard(recipe)).join('');
+        }
+
+        // Create individual recipe card HTML
+        function createRecipeCard(recipe) {
+            const difficultyClass = `difficulty-${recipe.difficulty.toLowerCase()}`;
+            const stars = generateStars(recipe.rating);
+            const tags = recipe.tags.slice(0, 3).map(tag => 
+                `<span class="tag">${tag}</span>`
+            ).join('');
+
+            return `
+                <article class="card fade-in">
+                    <div class="card-image">
+                        <img src="${recipe.image}" alt="${recipe.name}" loading="lazy" onerror="this.src='https://via.placeholder.com/400x300?text=No+Image'">
+                        <span class="difficulty-badge ${difficultyClass}">
+                            ${recipe.difficulty}
+                        </span>
+                    </div>
+                    <div class="p-5">
+                        <div class="flex items-start justify-between gap-3 mb-2">
+                            <h3 class="font-semibold text-lg text-stone-900 line-clamp-2 leading-snug">${recipe.name}</h3>
+                        </div>
+                        
+                        <div class="flex items-center gap-2 mb-4 text-sm text-stone-600">
+                            <i class="fa-solid fa-earth-americas text-orange-500"></i>
+                            <span>${recipe.cuisine}</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 mb-4 pb-4 border-b border-stone-100">
+                            <div class="flex items-center gap-2 text-sm">
+                                <i class="fa-regular fa-clock text-orange-500"></i>
+                                <div>
+                                    <div class="text-xs text-stone-500">Prep Time</div>
+                                    <div class="font-medium text-stone-900">${recipe.prepTimeMinutes}m</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 text-sm">
+                                <i class="fa-regular fa-star text-orange-500"></i>
+                                <div>
+                                    <div class="text-xs text-stone-500">Rating</div>
+                                    <div class="font-medium text-stone-900">${recipe.rating.toFixed(1)}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2">
+                            ${tags}
+                        </div>
+                    </div>
+                </article>
+            `;
+        }
+
+        // Generate star rating HTML
+        function generateStars(rating) {
+            const fullStars = Math.floor(rating);
+            const hasHalfStar = rating % 1 >= 0.5;
+            let starsHTML = '';
+            
+            for (let i = 0; i < 5; i++) {
+                if (i < fullStars) {
+                    starsHTML += '<i class="fa-solid fa-star rating-stars text-xs"></i>';
+                } else if (i === fullStars && hasHalfStar) {
+                    starsHTML += '<i class="fa-solid fa-star-half-stroke rating-stars text-xs"></i>';
+                } else {
+                    starsHTML += '<i class="fa-regular fa-star text-stone-300 text-xs"></i>';
+                }
+            }
+            return starsHTML;
+        }
+
+        // Filter recipes based on search input
+        function filterRecipes(searchTerm) {
+            const term = searchTerm.toLowerCase().trim();
+            
+            if (!term) {
+                filteredRecipes = [...allRecipes];
+            } else {
+                filteredRecipes = allRecipes.filter(recipe => {
+                    const nameMatch = recipe.name.toLowerCase().includes(term);
+                    const ingredientMatch = recipe.ingredients.some(ingredient => 
+                        ingredient.toLowerCase().includes(term)
+                    );
+                    const tagMatch = recipe.tags.some(tag => 
+                        tag.toLowerCase().includes(term)
+                    );
+                    return nameMatch || ingredientMatch || tagMatch;
+                });
+            }
+
+            renderRecipes(filteredRecipes);
+            updateStats();
+        }
+
+        // Update result count
+        function updateStats() {
+            elements.statsBar.classList.remove('hidden');
+            elements.resultCount.textContent = filteredRecipes.length;
+        }
+
+        // UI State Management
+        function showLoading() {
+            elements.loading.classList.remove('hidden');
+            elements.grid.classList.add('hidden');
+            elements.error.classList.add('hidden');
+            elements.noResults.classList.add('hidden');
+        }
+
+        function hideLoading() {
+            elements.loading.classList.add('hidden');
+            elements.grid.classList.remove('hidden');
+        }
+
+        function showError(message) {
+            elements.loading.classList.add('hidden');
+            elements.grid.classList.add('hidden');
+            elements.error.classList.remove('hidden');
+            elements.errorMessage.textContent = message || 'We couldn\'t fetch the recipes. Please try again.';
+        }
+
+        function showNoResults() {
+            elements.grid.classList.add('hidden');
+            elements.noResults.classList.remove('hidden');
+        }
+
+        function hideNoResults() {
+            elements.noResults.classList.add('hidden');
+        }
+
+        // Debounce function for search input
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Event Listeners
+        elements.searchInput.addEventListener('input', debounce((e) => {
+            filterRecipes(e.target.value);
+        }, 300));
+
+        elements.retryBtn.addEventListener('click', fetchRecipes);
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', fetchRecipes);
+    </script>
+</body>
+</html>
